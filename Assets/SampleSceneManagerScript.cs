@@ -221,62 +221,30 @@ public class SampleSceneManagerScript : MonoBehaviour
         {
             #region 到達できない所を削除
 
-            // 最も広い空き地を探す
-            var resultPoints = new List<(int x, int z)>();
+            // 連続する空き地毎にグループ分け
+            var pointGroups = new List<(int x, int z)[]>();
 
             ReadyCollectContiguousPoints();
             foreach (var (x, z, _) in mapPoints.Where(mapPoint => map[mapPoint.x, mapPoint.z] == pointTypeEmpty))
             {
                 CollectContiguousPoints(x, z, pointTypeEmpty);
-
-                if (resultPoints.Count < collectedPoints.Count)
+                if (collectedPoints.Any())
                 {
-                    resultPoints.Clear();
-                    resultPoints.AddRange(collectedPoints);
+                    pointGroups.Add(collectedPoints.ToArray());
+                    collectedPoints.Clear();
                 }
-                collectedPoints.Clear();
             }
 
-            if (resultPoints.Any())
+            if (pointGroups.Any())
             {
-                if (bAddSea)
-                {
-                    #region 海に遮られて到達できない場所は海
-
-                    ReadyCollectContiguousPoints();
-                    CollectContiguousPoints(
-                        resultPoints[0].x,
-                        resultPoints[0].z,
-                        pointTypeEmpty, pointTypeWall);
-
-                    // 空き地と壁を海にする
-                    foreach (var (x, z, _) in mapPoints
-                        .Where(p => map[p.x, p.z] == pointTypeEmpty || map[p.x, p.z] == pointTypeWall)
-                        .Where(p => !collectedPoints.Any(tp => tp.x == p.x && tp.z == p.z)))
-                    {
-                        map[x, z] = pointTypeSea;
-                    }
-
-                    #endregion
-                }
-
-                #region 壁に遮られて到達できない場所は壁
-
-                ReadyCollectContiguousPoints();
-                CollectContiguousPoints(
-                    resultPoints[0].x,
-                    resultPoints[0].z,
-                    pointTypeEmpty);
-
-                // 空き地を壁にする
-                foreach (var (x, z, _) in mapPoints
-                    .Where(p => map[p.x, p.z] == pointTypeEmpty)
-                    .Where(p => !collectedPoints.Any(tp => tp.x == p.x && tp.z == p.z)))
+                // 最も広い場所以外の空き地を壁で塗りつぶす
+                foreach (var (x, z) in pointGroups
+                    .OrderByDescending(group => group.Length)
+                    .Skip(1)
+                    .SelectMany(group => group))
                 {
                     map[x, z] = pointTypeWall;
                 }
-
-                #endregion
             }
             else
             {
