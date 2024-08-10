@@ -79,6 +79,10 @@ public class SampleSceneManagerScript : MonoBehaviour
     // マップデータ
     byte[,] map;
 
+    // マップ地点毎の処理用
+    List<(int x, int z)> collectedPoints = new List<(int x, int z)>();
+    bool[,] checkedMap;
+
     const byte pointTypeEmpty = 0;// 空き地
     const byte pointTypeWall = 1;// 壁
     const byte pointTypeSea = 2;// 海
@@ -104,6 +108,9 @@ public class SampleSceneManagerScript : MonoBehaviour
 
         // マップデータ
         map = new byte[mapWidth, mapDepth];
+
+        // マップ地点毎の処理用
+        checkedMap = new bool[mapWidth, mapDepth];
 
         // マップ内の各地点
         var mapPoints = Enumerable.Range(0, mapWidth)
@@ -272,9 +279,9 @@ public class SampleSceneManagerScript : MonoBehaviour
         #endregion
 
         #region オブジェクト生成
-        
+
         // 壁と海に NavMeshObstacle が付いているので NavMeshSurface が変化する
-        
+
         foreach (var (x, z, ground) in mapPoints.Where(p => p.ground.HasValue))
         {
             GameObject prefab;
@@ -366,36 +373,34 @@ public class SampleSceneManagerScript : MonoBehaviour
     }
 
     // 指定タイプが連続する地点を取得
-    List<(int x, int z)> collectedPoints = new List<(int x, int z)>();
-    bool[,] checkedMap;
     void ReadyCollectContiguousPoints()
     {
         collectedPoints.Clear();
-
-        if (checkedMap == null)
-        {
-            checkedMap = new bool[mapWidth, mapDepth];
-        }
-        else
-        {
-            Array.Clear(checkedMap, 0, checkedMap.Length);
-        }
+        Array.Clear(checkedMap, 0, checkedMap.Length);
     }
 
-    void CollectContiguousPoints(int x, int z, params byte[] pointTypes)
+    void CollectContiguousPoints(int baseX, int baseZ, params byte[] pointTypes)
     {
-        if (!IsInMap(x, z)) return;
+        var queue = new Queue<(int x, int z)>();
+        queue.Enqueue((baseX, baseZ));
 
-        if (checkedMap[x, z]) return;
-        checkedMap[x, z] = true;
+        while (queue.Count > 0)
+        {
+            var pos = queue.Dequeue();
 
-        if (!pointTypes.Contains(map[x, z])) return;
+            if (!IsInMap(pos.x, pos.z)) continue;
 
-        collectedPoints.Add((x, z));
+            if (checkedMap[pos.x, pos.z]) continue;
+            checkedMap[pos.x, pos.z] = true;
 
-        CollectContiguousPoints(x - 1, z, pointTypes);//再帰
-        CollectContiguousPoints(x + 1, z, pointTypes);//再帰
-        CollectContiguousPoints(x, z - 1, pointTypes);//再帰
-        CollectContiguousPoints(x, z + 1, pointTypes);//再帰
+            if (!pointTypes.Contains(map[pos.x, pos.z])) continue;
+
+            collectedPoints.Add((pos.x, pos.z));
+
+            queue.Enqueue((pos.x - 1, pos.z));
+            queue.Enqueue((pos.x + 1, pos.z));
+            queue.Enqueue((pos.x, pos.z - 1));
+            queue.Enqueue((pos.x, pos.z + 1));
+        }
     }
 }
